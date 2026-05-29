@@ -5,7 +5,8 @@ import type { ProductInput } from "@/lib/catalog";
 import { adminCookieName, verifyAdminSessionToken } from "@/lib/admin-session";
 
 async function isAllowed() {
-  return Boolean(await verifyAdminSessionToken((await cookies()).get(adminCookieName)?.value));
+  const session = await verifyAdminSessionToken((await cookies()).get(adminCookieName)?.value);
+  return session?.role === "admin";
 }
 
 export async function GET() {

@@ -1,6 +1,5 @@
 import "server-only";
 
-import { scryptSync, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { adminCookieName, verifyAdminSessionToken } from "@/lib/admin-session";
 
@@ -37,20 +36,8 @@ export function findAdminByEmail(email: string) {
   return getAdminUsers().find((user) => user.email.toLowerCase() === email.trim().toLowerCase());
 }
 
-export function verifyPassword(password: string, storedHash: string) {
-  const [algorithm, salt, hash] = storedHash.split(":");
-
-  if (algorithm !== "scrypt" || !salt || !hash) {
-    return false;
-  }
-
-  const expected = Buffer.from(hash, "hex");
-  const actual = scryptSync(password, salt, expected.length);
-
-  return actual.length === expected.length && timingSafeEqual(actual, expected);
-}
-
 export async function isAdminAuthenticated() {
   const token = (await cookies()).get(adminCookieName)?.value;
-  return Boolean(await verifyAdminSessionToken(token));
+  const session = await verifyAdminSessionToken(token);
+  return session?.role === "admin";
 }

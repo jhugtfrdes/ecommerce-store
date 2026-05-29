@@ -1,8 +1,9 @@
 "use client";
 
 import Image from "next/image";
+import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
-import { ImagePlus, Loader2, LogOut, Pencil, Plus, Save, Trash2 } from "lucide-react";
+import { Boxes, ImagePlus, Loader2, LogOut, Package, Pencil, Plus, Save, Sparkles, Trash2, TrendingUp } from "lucide-react";
 import type { Product } from "@/lib/products";
 import { formatCurrency } from "@/lib/format";
 
@@ -42,7 +43,12 @@ export function AdminDashboard({ initialProducts }: { initialProducts: Product[]
   const [message, setMessage] = useState("");
 
   const editing = Boolean(form.id);
-  const totalStock = useMemo(() => products.reduce((total, product) => total + product.stock, 0), [products]);
+  const stats = useMemo(() => {
+    const totalStock = products.reduce((total, product) => total + product.stock, 0);
+    const inventoryValue = products.reduce((total, product) => total + product.stock * product.price, 0);
+    const averagePrice = products.length ? products.reduce((total, product) => total + product.price, 0) / products.length : 0;
+    return { totalStock, inventoryValue, averagePrice };
+  }, [products]);
 
   function editProduct(product: Product) {
     setForm({
@@ -144,32 +150,44 @@ export function AdminDashboard({ initialProducts }: { initialProducts: Product[]
       ...current,
       images: current.images ? `${current.images}\n${uploadedUrl}` : uploadedUrl
     }));
-    setMessage("Imagem adicionada ao produto.");
+    setMessage("Imagem adicionada.");
   }
 
   async function logout() {
-    await fetch("/api/admin/logout", { method: "POST" });
-    window.location.reload();
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/";
   }
 
   return (
-    <div className="min-h-[80svh] bg-ink px-4 pb-20 pt-24 sm:px-6 lg:px-8">
+    <div className="min-h-[80svh] bg-[radial-gradient(circle_at_75%_0%,rgba(126,87,255,0.14),transparent_32%),radial-gradient(circle_at_20%_8%,rgba(99,230,190,0.12),transparent_30%),#07080a] px-4 pb-20 pt-24 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-sm font-medium uppercase tracking-[0.22em] text-mint">Painel Admin</p>
-            <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">Gerir loja</h1>
-            <p className="mt-3 text-titanium">{products.length} produtos ativos · {totalStock} unidades em stock</p>
+            <h1 className="mt-3 text-4xl font-semibold text-white sm:text-6xl">Command center.</h1>
+            <p className="mt-3 max-w-2xl text-titanium">Produtos, stock, imagens e preço numa interface rápida, densa e consistente com a marca.</p>
           </div>
-          <button onClick={logout} className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-white/10 px-5 text-sm font-semibold text-white transition hover:bg-white/10">
+          <button onClick={logout} className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-5 text-sm font-semibold text-white transition hover:bg-white/10">
             <LogOut size={17} />
             Sair
           </button>
+        </motion.div>
+
+        <div className="mt-8 grid gap-3 sm:grid-cols-3">
+          <Stat icon={Package} label="Produtos" value={String(products.length)} />
+          <Stat icon={Boxes} label="Stock" value={String(stats.totalStock)} />
+          <Stat icon={TrendingUp} label="Valor inventário" value={formatCurrency(stats.inventoryValue)} />
         </div>
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-[420px_1fr]">
-          <form onSubmit={saveProduct} className="premium-border h-fit rounded-lg bg-white/[0.04] p-5">
-            <h2 className="text-xl font-semibold text-white">{editing ? "Editar produto" : "Adicionar produto"}</h2>
+        <div className="mt-8 grid gap-6 lg:grid-cols-[400px_1fr]">
+          <motion.form initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} onSubmit={saveProduct} className="premium-border h-fit rounded-xl bg-white/[0.055] p-5 shadow-premium backdrop-blur-2xl">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-white">{editing ? "Editar produto" : "Novo produto"}</h2>
+                <p className="mt-1 text-sm text-titanium">Alterações refletem no catálogo sem deploy.</p>
+              </div>
+              <Sparkles className="text-mint" size={22} />
+            </div>
             <div className="mt-5 grid gap-4">
               <Field label="Nome" value={form.name} onChange={(value) => setForm({ ...form, name: value })} />
               <Field label="Categoria" value={form.category} onChange={(value) => setForm({ ...form, category: value })} />
@@ -185,37 +203,38 @@ export function AdminDashboard({ initialProducts }: { initialProducts: Product[]
               <Textarea label="Descrição" value={form.description} onChange={(value) => setForm({ ...form, description: value })} />
               <Textarea label="Features separadas por vírgula" value={form.features} onChange={(value) => setForm({ ...form, features: value })} />
               <Textarea label="Imagens, uma por linha" value={form.images} onChange={(value) => setForm({ ...form, images: value })} />
-              <label className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-full border border-white/10 text-sm font-semibold text-white transition hover:bg-white/10">
-                {uploading ? <Loader2 className="animate-spin" size={18} /> : <ImagePlus size={18} />}
+              <label className="group flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-white/15 bg-ink/55 p-4 text-center text-sm font-semibold text-white transition hover:border-mint/50 hover:bg-mint/10">
+                {uploading ? <Loader2 className="animate-spin" size={20} /> : <ImagePlus className="text-mint transition group-hover:scale-110" size={22} />}
                 Upload de imagem
+                <span className="text-xs font-normal text-titanium">JPG, PNG, WEBP ou SVG até 4MB</span>
                 <input type="file" accept="image/*" onChange={uploadImage} className="hidden" />
               </label>
             </div>
-            {message ? <p className="mt-4 text-sm text-mint">{message}</p> : null}
+            {message ? <p className="mt-4 rounded-md border border-mint/20 bg-mint/10 p-3 text-sm text-white">{message}</p> : null}
             <div className="mt-5 flex gap-3">
               <button disabled={saving} className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-white px-5 text-sm font-semibold text-ink transition hover:scale-[1.01] disabled:opacity-60">
                 {saving ? <Loader2 className="animate-spin" size={18} /> : editing ? <Save size={18} /> : <Plus size={18} />}
                 {editing ? "Guardar" : "Adicionar"}
               </button>
               {editing ? (
-                <button type="button" onClick={() => setForm(emptyForm)} className="h-12 rounded-full border border-white/10 px-5 text-sm font-semibold text-white">
+                <button type="button" onClick={() => setForm(emptyForm)} className="h-12 rounded-full border border-white/10 px-5 text-sm font-semibold text-white transition hover:bg-white/10">
                   Novo
                 </button>
               ) : null}
             </div>
-          </form>
+          </motion.form>
 
-          <div className="grid gap-4">
-            {products.map((product) => (
-              <article key={product.id} className="premium-border grid gap-4 rounded-lg bg-white/[0.035] p-4 sm:grid-cols-[110px_1fr_auto]">
-                <Image src={product.images[0]} alt={product.name} width={220} height={220} className="aspect-square rounded-md object-cover" />
-                <div>
+          <div className="grid gap-3">
+            {products.map((product, index) => (
+              <motion.article key={product.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.035 }} className="premium-border grid gap-4 rounded-xl bg-white/[0.04] p-3 backdrop-blur-xl transition hover:border-white/20 hover:bg-white/[0.06] sm:grid-cols-[92px_1fr_auto] sm:p-4">
+                <Image src={product.images[0]} alt={product.name} width={184} height={184} className="aspect-square rounded-lg object-cover" />
+                <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-semibold text-white">{product.name}</h3>
                     <span className="rounded-full bg-mint/10 px-2 py-1 text-xs font-semibold text-mint">{product.category}</span>
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-titanium">{product.shortDescription}</p>
-                  <p className="mt-3 text-sm text-white">{formatCurrency(product.price)} · Stock {product.stock}</p>
+                  <p className="mt-2 line-clamp-2 text-sm leading-6 text-titanium">{product.shortDescription}</p>
+                  <p className="mt-3 text-sm text-white">{formatCurrency(product.price)} · Stock {product.stock} · Rating {product.rating}</p>
                 </div>
                 <div className="flex gap-2 sm:flex-col">
                   <button onClick={() => editProduct(product)} className="grid h-10 w-10 place-items-center rounded-full border border-white/10 text-white transition hover:bg-white/10" aria-label="Editar produto">
@@ -225,7 +244,7 @@ export function AdminDashboard({ initialProducts }: { initialProducts: Product[]
                     <Trash2 size={17} />
                   </button>
                 </div>
-              </article>
+              </motion.article>
             ))}
           </div>
         </div>
@@ -234,11 +253,21 @@ export function AdminDashboard({ initialProducts }: { initialProducts: Product[]
   );
 }
 
+function Stat({ icon: Icon, label, value }: { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; value: string }) {
+  return (
+    <div className="premium-border rounded-xl bg-white/[0.045] p-4 backdrop-blur-xl">
+      <Icon className="text-mint" size={20} />
+      <p className="mt-4 text-xs uppercase tracking-[0.18em] text-titanium">{label}</p>
+      <p className="mt-1 text-xl font-semibold text-white">{value}</p>
+    </div>
+  );
+}
+
 function Field({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
   return (
     <label className="block text-sm font-medium text-white">
       {label}
-      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 h-11 w-full rounded-lg border border-white/10 bg-ink px-3 text-sm text-white outline-none transition focus:border-mint/70" />
+      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 h-11 w-full rounded-lg border border-white/10 bg-ink/80 px-3 text-sm text-white outline-none transition focus:border-mint/70" />
     </label>
   );
 }
@@ -247,7 +276,7 @@ function Textarea({ label, value, onChange }: { label: string; value: string; on
   return (
     <label className="block text-sm font-medium text-white">
       {label}
-      <textarea value={value} onChange={(event) => onChange(event.target.value)} rows={3} className="mt-2 w-full resize-y rounded-lg border border-white/10 bg-ink px-3 py-3 text-sm text-white outline-none transition focus:border-mint/70" />
+      <textarea value={value} onChange={(event) => onChange(event.target.value)} rows={3} className="mt-2 w-full resize-y rounded-lg border border-white/10 bg-ink/80 px-3 py-3 text-sm text-white outline-none transition focus:border-mint/70" />
     </label>
   );
 }

@@ -1,8 +1,5 @@
-import { NextResponse } from "next/server";
-import { adminCookieName } from "@/lib/admin-session";
+import { POST as logout } from "@/app/api/auth/logout/route";
 
 export async function POST() {
-  const response = NextResponse.json({ ok: true });
-  response.cookies.delete(adminCookieName);
-  return response;
+  return logout();
 }

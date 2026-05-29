@@ -9,8 +9,8 @@ const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/sv
 const maxUploadSize = 4 * 1024 * 1024;
 
 export async function POST(request: Request) {
-  const allowed = await verifyAdminSessionToken((await cookies()).get(adminCookieName)?.value);
-  if (!allowed) {
+  const session = await verifyAdminSessionToken((await cookies()).get(adminCookieName)?.value);
+  if (session?.role !== "admin") {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 

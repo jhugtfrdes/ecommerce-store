@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Star } from "lucide-react";
 import { AddToCart } from "@/components/add-to-cart";
 import { formatCurrency } from "@/lib/format";
 import type { Product } from "@/lib/products";
@@ -39,6 +39,13 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
             <p className="mt-1 truncate text-xs text-titanium sm:text-sm">{product.category}</p>
           </div>
           <p className="shrink-0 text-sm font-semibold text-white sm:text-base">{formatCurrency(product.price)}</p>
+        </div>
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1 text-mint">
+            <Star size={13} fill="currentColor" />
+            <span className="text-xs font-semibold">{product.rating}.0</span>
+          </div>
+          <span className="text-xs text-titanium">{product.stock > 0 ? `${product.stock} stock` : "Esgotado"}</span>
         </div>
         <p className="mt-2 line-clamp-2 min-h-10 text-xs leading-5 text-titanium sm:text-sm">{product.shortDescription}</p>
         <div className="mt-3">

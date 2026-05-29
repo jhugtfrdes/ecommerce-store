@@ -5,16 +5,27 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isAdminPage = pathname === "/admin" || pathname.startsWith("/admin/");
   const isAdminApi = pathname.startsWith("/api/admin/");
-  const isLoginPage = pathname === "/admin/login";
   const isLoginApi = pathname === "/api/admin/login";
+  const isAccountPage = pathname === "/account";
 
-  if ((!isAdminPage && !isAdminApi) || isLoginPage || isLoginApi) {
+  if (pathname === "/admin/login") {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    loginUrl.searchParams.set("next", "/admin");
+    return NextResponse.redirect(loginUrl);
+  }
+
+  if ((!isAdminPage && !isAdminApi && !isAccountPage) || isLoginApi) {
     return NextResponse.next();
   }
 
   const session = await verifyAdminSessionToken(request.cookies.get(adminCookieName)?.value);
 
-  if (session) {
+  if (isAccountPage && session) {
+    return NextResponse.next();
+  }
+
+  if ((isAdminPage || isAdminApi) && session?.role === "admin") {
     return NextResponse.next();
   }
 
@@ -23,11 +34,11 @@ export async function middleware(request: NextRequest) {
   }
 
   const loginUrl = request.nextUrl.clone();
-  loginUrl.pathname = "/admin/login";
+  loginUrl.pathname = "/login";
   loginUrl.searchParams.set("next", pathname);
   return NextResponse.redirect(loginUrl);
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*"]
+  matcher: ["/admin/:path*", "/api/admin/:path*", "/account"]
 };
