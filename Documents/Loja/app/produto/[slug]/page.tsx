@@ -5,20 +5,24 @@ import { notFound } from "next/navigation";
 import { Check, Star } from "lucide-react";
 import { AddToCart } from "@/components/add-to-cart";
 import { ReviewCard } from "@/components/review-card";
+import { getProductBySlug, getProducts } from "@/lib/catalog";
 import { formatCurrency } from "@/lib/format";
-import { getProductBySlug, products, reviews } from "@/lib/products";
+import { reviews } from "@/lib/products";
 
 type ProductPageProps = {
   params: Promise<{ slug: string }>;
 };
 
-export function generateStaticParams() {
+export const dynamic = "force-dynamic";
+
+export async function generateStaticParams() {
+  const products = await getProducts();
   return products.map((product) => ({ slug: product.slug }));
 }
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const product = getProductBySlug(slug);
+  const product = await getProductBySlug(slug);
 
   if (!product) {
     return {};
@@ -37,7 +41,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 
 export default async function ProductPage({ params }: ProductPageProps) {
   const { slug } = await params;
-  const product = getProductBySlug(slug);
+  const product = await getProductBySlug(slug);
 
   if (!product) {
     notFound();

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 900 900" role="img" aria-label="Imagem de produto">
+  <rect width="900" height="900" fill="#101318"/>
+  <circle cx="450" cy="405" r="130" fill="#1f2933"/>
+  <path d="M220 690c82-116 163-174 244-174 72 0 144 39 216 118l64 56H220Z" fill="#2d3845"/>
+  <text x="450" y="780" fill="#aeb7c2" font-family="Arial, sans-serif" font-size="34" text-anchor="middle">Noir Atelier</text>
+</svg>

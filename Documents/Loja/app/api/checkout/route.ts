@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { products } from "@/lib/products";
+import { getProducts } from "@/lib/catalog";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
@@ -22,6 +22,7 @@ export async function POST(request: Request) {
   }
 
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
+  const products = await getProducts();
 
   for (const item of body.items) {
     const product = products.find((candidate) => candidate.id === item.id);
