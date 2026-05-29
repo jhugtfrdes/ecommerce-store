@@ -1,1 +1,10 @@
-[]
+[
+  {
+    "id": "user_9f0a42dd-ca29-439c-bd55-84a9e1ff7e41",
+    "email": "user-1507779335@example.com",
+    "name": "Teste User",
+    "passwordHash": "scrypt:f400e38898160231077241d9867a50a6:1ff979f570cf8d1f95b5c2498b7390c94480d4baee1b43111b43017621a0d118c0354afa0b74e5e98cd4c28cd3011d89017f0b968b91a253d79b9c70fd2477de",
+    "role": "user",
+    "createdAt": "2026-05-29T23:16:57.789Z"
+  }
+]

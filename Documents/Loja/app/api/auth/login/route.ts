@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server";
 import { findIdentityByEmail } from "@/lib/auth";
 import { verifyPassword } from "@/lib/password";
-import { adminCookieName, createAdminSessionToken, getSessionSecret } from "@/lib/admin-session";
+import { adminCookieName, createAdminSessionToken } from "@/lib/admin-session";
+import { getSetupMessage } from "@/lib/env";
 
 export async function POST(request: Request) {
   const body = (await request.json()) as { email?: string; password?: string };
-
-  if (!getSessionSecret()) {
-    return NextResponse.json({ error: "ADMIN_SESSION_SECRET não está configurado." }, { status: 500 });
-  }
 
   if (!body.email || !body.password) {
     return NextResponse.json({ error: "Email e password são obrigatórios." }, { status: 400 });
@@ -17,7 +14,13 @@ export async function POST(request: Request) {
   const identity = await findIdentityByEmail(body.email);
 
   if (!identity || !verifyPassword(body.password, identity.passwordHash)) {
-    return NextResponse.json({ error: "Credenciais inválidas." }, { status: 401 });
+    const setup = getSetupMessage();
+    return NextResponse.json({
+      error: setup.configured
+        ? "Credenciais inválidas."
+        : "Credenciais inválidas. Para criar o admin inicial, executa npm run setup e reinicia o servidor.",
+      setup
+    }, { status: 401 });
   }
 
   const response = NextResponse.json({

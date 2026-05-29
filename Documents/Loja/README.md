@@ -28,13 +28,21 @@ O catálogo está em `lib/products.ts`. Para produção, substitui os `stripePri
 
 ## Admin
 
-Gera uma hash para a password:
+Setup recomendado:
+
+```bash
+npm run setup
+```
+
+O comando cria `.env.local` com `ADMIN_SESSION_SECRET`, `ADMIN_EMAIL` e `ADMIN_PASSWORD_HASH`.
+
+Também podes gerar apenas uma hash:
 
 ```bash
 npm run admin:hash -- "a-tua-password-segura"
 ```
 
-Define `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH` e `ADMIN_SESSION_SECRET` em `.env.local`. Para vários administradores no futuro, usa `ADMIN_USERS_JSON` com uma lista de utilizadores. Abre `/admin/login`; `/admin` e `/admin/*` ficam protegidos por sessão em cookie HttpOnly.
+Para Vercel, copia as mesmas variáveis para Project Settings -> Environment Variables. Para vários administradores no futuro, usa `ADMIN_USERS_JSON` com uma lista de utilizadores. Abre `/login`; `/admin` e `/admin/*` ficam protegidos por role `admin`.
 
 Webhook local recomendado:
 

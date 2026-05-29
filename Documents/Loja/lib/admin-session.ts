@@ -9,15 +9,24 @@ export const adminCookieName = "noir_admin_session";
 
 const encoder = new TextEncoder();
 
+declare global {
+  var __NOIR_RUNTIME_SESSION_SECRET__: string | undefined;
+}
+
 export function getSessionSecret() {
-  return process.env.ADMIN_SESSION_SECRET;
+  if (process.env.ADMIN_SESSION_SECRET) {
+    return process.env.ADMIN_SESSION_SECRET;
+  }
+
+  if (!globalThis.__NOIR_RUNTIME_SESSION_SECRET__) {
+    globalThis.__NOIR_RUNTIME_SESSION_SECRET__ = crypto.randomUUID();
+  }
+
+  return globalThis.__NOIR_RUNTIME_SESSION_SECRET__;
 }
 
 export async function createAdminSessionToken(session: Omit<AdminSession, "exp">) {
   const secret = getSessionSecret();
-  if (!secret) {
-    throw new Error("ADMIN_SESSION_SECRET is not configured.");
-  }
 
   const payload: AdminSession = {
     ...session,

@@ -1,13 +1,9 @@
 import { NextResponse } from "next/server";
 import { createStoredUser } from "@/lib/users";
-import { adminCookieName, createAdminSessionToken, getSessionSecret } from "@/lib/admin-session";
+import { adminCookieName, createAdminSessionToken } from "@/lib/admin-session";
 
 export async function POST(request: Request) {
   const body = (await request.json()) as { email?: string; name?: string; password?: string };
-
-  if (!getSessionSecret()) {
-    return NextResponse.json({ error: "ADMIN_SESSION_SECRET não está configurado." }, { status: 500 });
-  }
 
   if (!body.email || !body.password || body.password.length < 8) {
     return NextResponse.json({ error: "Email e password com pelo menos 8 caracteres são obrigatórios." }, { status: 400 });
