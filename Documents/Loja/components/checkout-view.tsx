@@ -36,12 +36,12 @@ export function CheckoutView() {
   }
 
   return (
-    <div className="min-h-[80svh] bg-ink px-4 pb-20 pt-24 sm:px-6 lg:px-8">
+    <div className="min-h-[80svh] bg-[radial-gradient(circle_at_70%_0%,rgba(99,230,190,0.12),transparent_30%),#07080a] px-4 pb-20 pt-24 sm:px-6 lg:px-8">
       <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[1fr_420px]">
         <section>
           <p className="text-sm font-medium uppercase tracking-[0.22em] text-mint">Checkout seguro</p>
           <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">Finalizar encomenda</h1>
-          <div className="premium-border mt-8 rounded-lg bg-white/[0.03] p-6">
+          <div className="premium-border mt-8 rounded-lg bg-white/[0.045] p-6 shadow-premium">
             <div className="flex items-center gap-3 text-white">
               <Lock size={20} className="text-mint" />
               <h2 className="text-xl font-semibold">Pagamento via Stripe</h2>

@@ -3,12 +3,13 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { adminCookieName, verifyAdminToken } from "@/lib/admin-auth";
+import { adminCookieName, verifyAdminSessionToken } from "@/lib/admin-session";
 
 const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/svg+xml"]);
+const maxUploadSize = 4 * 1024 * 1024;
 
 export async function POST(request: Request) {
-  const allowed = verifyAdminToken((await cookies()).get(adminCookieName())?.value);
+  const allowed = await verifyAdminSessionToken((await cookies()).get(adminCookieName)?.value);
   if (!allowed) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
@@ -18,6 +19,10 @@ export async function POST(request: Request) {
 
   if (!(file instanceof File) || !allowedTypes.has(file.type)) {
     return NextResponse.json({ error: "Imagem inválida." }, { status: 400 });
+  }
+
+  if (file.size > maxUploadSize) {
+    return NextResponse.json({ error: "Imagem demasiado grande. Máximo 4MB." }, { status: 413 });
   }
 
   const filename = `${randomUUID()}.${extensionFromType(file.type)}`;

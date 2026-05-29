@@ -6,5 +6,5 @@ export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const products = await getProducts();
-  return <HomeExperience featured={products.slice(0, 3)} reviews={reviews} />;
+  return <HomeExperience featured={products} reviews={reviews} />;
 }

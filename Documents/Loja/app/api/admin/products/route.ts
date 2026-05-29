@@ -2,10 +2,10 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createProduct, deleteProduct, getProducts, updateProduct } from "@/lib/catalog";
 import type { ProductInput } from "@/lib/catalog";
-import { adminCookieName, verifyAdminToken } from "@/lib/admin-auth";
+import { adminCookieName, verifyAdminSessionToken } from "@/lib/admin-session";
 
 async function isAllowed() {
-  return verifyAdminToken((await cookies()).get(adminCookieName())?.value);
+  return Boolean(await verifyAdminSessionToken((await cookies()).get(adminCookieName)?.value));
 }
 
 export async function GET() {

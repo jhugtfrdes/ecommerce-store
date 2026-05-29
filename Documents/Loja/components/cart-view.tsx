@@ -12,7 +12,7 @@ export function CartView() {
   const total = subtotal + shipping;
 
   return (
-    <div className="min-h-[80svh] bg-ink px-4 pb-20 pt-24 sm:px-6 lg:px-8">
+    <div className="min-h-[80svh] bg-[radial-gradient(circle_at_50%_0%,rgba(126,87,255,0.10),transparent_30%),#07080a] px-4 pb-20 pt-24 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
         <h1 className="text-4xl font-semibold text-white sm:text-5xl">Carrinho</h1>
         {items.length === 0 ? (

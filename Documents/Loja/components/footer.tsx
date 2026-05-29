@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export function Footer() {
   return (
-    <footer className="border-t border-white/10 bg-ink px-4 py-10 sm:px-6 lg:px-8">
+    <footer className="border-t border-white/10 bg-[linear-gradient(180deg,#07080a,#0d1117)] px-4 py-10 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-6 text-sm text-titanium sm:flex-row sm:items-center sm:justify-between">
         <div>
           <Link href="/" className="font-semibold text-white">
@@ -19,6 +19,9 @@ export function Footer() {
           </Link>
           <Link href="/checkout" className="transition hover:text-white">
             Checkout
+          </Link>
+          <Link href="/admin" className="transition hover:text-white">
+            Admin
           </Link>
         </div>
       </div>

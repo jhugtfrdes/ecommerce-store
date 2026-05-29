@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Menu, ShoppingBag, X } from "lucide-react";
+import { Menu, Settings, ShoppingBag, X } from "lucide-react";
 import { useState } from "react";
 import { useCart } from "@/components/cart-provider";
 
@@ -10,9 +10,9 @@ export function Navbar() {
   const { count } = useCart();
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-ink/70 backdrop-blur-xl">
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-ink/62 backdrop-blur-2xl">
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Link href="/" className="text-base font-semibold text-white">
+        <Link href="/" className="text-base font-semibold text-white transition hover:text-mint">
           Noir Atelier
         </Link>
         <div className="hidden items-center gap-8 text-sm text-titanium md:flex">
@@ -25,8 +25,18 @@ export function Navbar() {
           <Link href="/checkout" className="transition hover:text-white">
             Checkout
           </Link>
+          <Link href="/admin" className="transition hover:text-white">
+            Admin
+          </Link>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            href="/admin"
+            className="hidden h-10 w-10 items-center justify-center rounded-full border border-white/10 text-white transition hover:bg-white/10 sm:inline-flex"
+            aria-label="Abrir admin"
+          >
+            <Settings size={18} />
+          </Link>
           <Link
             href="/carrinho"
             className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-white transition hover:bg-white/10"
@@ -60,6 +70,9 @@ export function Navbar() {
             </Link>
             <Link href="/checkout" onClick={() => setOpen(false)}>
               Checkout
+            </Link>
+            <Link href="/admin" onClick={() => setOpen(false)}>
+              Admin
             </Link>
           </div>
         </div>
