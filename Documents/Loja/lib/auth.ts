@@ -1,38 +1,36 @@
 import "server-only";
 
-import { cookies } from "next/headers";
-import { findAdminByEmail } from "@/lib/admin-auth";
-import { adminCookieName, verifyAdminSessionToken } from "@/lib/admin-session";
-import { findStoredUserByEmail } from "@/lib/users";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+
+type ProfileAuth = {
+  email: string;
+  full_name: string | null;
+  role: "user" | "admin";
+};
 
 export async function getCurrentSession() {
-  return verifyAdminSessionToken((await cookies()).get(adminCookieName)?.value);
-}
-
-export async function findIdentityByEmail(email: string) {
-  const admin = findAdminByEmail(email);
-
-  if (admin) {
-    return {
-      id: admin.id,
-      email: admin.email,
-      name: admin.email.split("@")[0],
-      passwordHash: admin.passwordHash,
-      role: "admin" as const
-    };
-  }
-
-  const user = await findStoredUserByEmail(email);
-
-  if (!user) {
+  if (!isSupabaseConfigured()) {
     return null;
   }
 
+  const supabase = await createSupabaseServerClient();
+  const { data: userData } = await supabase.auth.getUser();
+
+  if (!userData.user) {
+    return null;
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("email, full_name, role")
+    .eq("id", userData.user.id)
+    .maybeSingle<ProfileAuth>();
+
   return {
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    passwordHash: user.passwordHash,
-    role: user.role
+    sub: userData.user.id,
+    email: profile?.email ?? userData.user.email ?? "",
+    name: profile?.full_name ?? userData.user.user_metadata?.name ?? null,
+    role: profile?.role ?? "user"
   };
 }

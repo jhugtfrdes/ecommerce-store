@@ -1,17 +1,23 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { adminCookieName, verifyAdminSessionToken } from "@/lib/admin-session";
+import { isAdminAuthenticated } from "@/lib/admin-auth";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { getSupabaseConfig } from "@/lib/supabase/config";
 
 const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/svg+xml"]);
 const maxUploadSize = 4 * 1024 * 1024;
+const bucket = "product-images";
 
 export async function POST(request: Request) {
-  const session = await verifyAdminSessionToken((await cookies()).get(adminCookieName)?.value);
-  if (session?.role !== "admin") {
-    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  if (!(await isAdminAuthenticated())) {
+    return NextResponse.json({ error: "Apenas administradores." }, { status: 403 });
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const { url } = getSupabaseConfig();
+
+  if (!supabase || !url) {
+    return NextResponse.json({ error: "SUPABASE_SERVICE_ROLE_KEY não está configurada." }, { status: 503 });
   }
 
   const formData = await request.formData();
@@ -26,14 +32,18 @@ export async function POST(request: Request) {
   }
 
   const filename = `${randomUUID()}.${extensionFromType(file.type)}`;
-  const uploadDir = path.join(process.cwd(), "public", "uploads");
-  const uploadPath = path.join(uploadDir, filename);
-  const bytes = Buffer.from(await file.arrayBuffer());
+  const path = `products/${filename}`;
+  const { error } = await supabase.storage.from(bucket).upload(path, file, {
+    contentType: file.type,
+    upsert: false
+  });
 
-  await mkdir(uploadDir, { recursive: true });
-  await writeFile(uploadPath, bytes);
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
 
-  return NextResponse.json({ url: `/uploads/${filename}` });
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  return NextResponse.json({ url: data.publicUrl });
 }
 
 function extensionFromType(type: string) {

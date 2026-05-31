@@ -1,12 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { adminCookieName, verifyAdminSessionToken } from "@/lib/admin-session";
+import { updateSupabaseSession } from "@/lib/supabase/middleware";
+
+type ProfileRole = {
+  role: "user" | "admin";
+};
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isAdminPage = pathname === "/admin" || pathname.startsWith("/admin/");
-  const isAdminApi = pathname.startsWith("/api/admin/");
-  const isLoginApi = pathname === "/api/admin/login";
-  const isAccountPage = pathname === "/account";
+  const { response, supabase } = await updateSupabaseSession(request);
 
   if (pathname === "/admin/login") {
     const loginUrl = request.nextUrl.clone();
@@ -15,28 +16,58 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if ((!isAdminPage && !isAdminApi && !isAccountPage) || isLoginApi) {
-    return NextResponse.next();
+  const isAdminPage = pathname === "/admin" || pathname.startsWith("/admin/");
+  const isAdminApi = pathname.startsWith("/api/admin/");
+  const isAccountPage = pathname === "/account";
+
+  if (!isAdminPage && !isAdminApi && !isAccountPage) {
+    return response;
   }
 
-  const session = await verifyAdminSessionToken(request.cookies.get(adminCookieName)?.value);
-
-  if (isAccountPage && session) {
-    return NextResponse.next();
+  if (!supabase) {
+    if (isAdminApi) {
+      return NextResponse.json({ error: "Supabase não está configurado." }, { status: 503 });
+    }
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    loginUrl.searchParams.set("next", pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
-  if ((isAdminPage || isAdminApi) && session?.role === "admin") {
-    return NextResponse.next();
+  const { data: userData } = await supabase.auth.getUser();
+
+  if (!userData.user) {
+    if (isAdminApi) {
+      return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+    }
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    loginUrl.searchParams.set("next", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  if (isAccountPage) {
+    return response;
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", userData.user.id)
+    .maybeSingle<ProfileRole>();
+
+  if (profile?.role === "admin") {
+    return response;
   }
 
   if (isAdminApi) {
-    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+    return NextResponse.json({ error: "Apenas administradores." }, { status: 403 });
   }
 
-  const loginUrl = request.nextUrl.clone();
-  loginUrl.pathname = "/login";
-  loginUrl.searchParams.set("next", pathname);
-  return NextResponse.redirect(loginUrl);
+  const accountUrl = request.nextUrl.clone();
+  accountUrl.pathname = "/account";
+  accountUrl.search = "";
+  return NextResponse.redirect(accountUrl);
 }
 
 export const config = {

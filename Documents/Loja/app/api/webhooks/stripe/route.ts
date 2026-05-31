@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -24,7 +25,20 @@ export async function POST(request: Request) {
 
     if (event.type === "checkout.session.completed") {
       const session = event.data.object;
-      console.log("Checkout concluído:", session.id);
+      const orderId = session.metadata?.orderId;
+      const supabase = createSupabaseAdminClient();
+
+      if (orderId && supabase) {
+        await supabase
+          .from("orders")
+          .update({
+            status: "paid",
+            stripe_session_id: session.id,
+            email: session.customer_details?.email ?? session.customer_email ?? null,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", orderId);
+      }
     }
 
     return NextResponse.json({ received: true });

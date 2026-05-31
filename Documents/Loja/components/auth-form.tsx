@@ -17,6 +17,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const isRegister = mode === "register";
 
@@ -24,21 +25,33 @@ export function AuthForm({ mode }: AuthFormProps) {
     event.preventDefault();
     setLoading(true);
     setError("");
+    setSuccess("");
 
-    const response = await fetch(isRegister ? "/api/auth/register" : "/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password })
-    });
+    try {
+      const response = await fetch(isRegister ? "/api/auth/register" : "/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password })
+      });
 
-    if (!response.ok) {
-      const data = (await response.json()) as { error?: string };
-      setError(data.error || "Não foi possível autenticar.");
+      const data = (await response.json().catch(() => ({}))) as { error?: string; needsEmailConfirmation?: boolean };
+
+      if (!response.ok) {
+        setError(data.error || "Não foi possível autenticar.");
+        return;
+      }
+
+      if (isRegister && data.needsEmailConfirmation) {
+        setSuccess("Conta criada. Confirma o email no Supabase Auth antes de entrar.");
+        return;
+      }
+
+      window.location.href = searchParams.get("next") || "/account";
+    } catch {
+      setError("Não foi possível ligar ao servidor. Tenta novamente.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    window.location.href = searchParams.get("next") || "/account";
   }
 
   return (
@@ -64,6 +77,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         <Input icon={Lock} label="Password" type="password" value={password} onChange={setPassword} autoComplete={isRegister ? "new-password" : "current-password"} placeholder="Mínimo 8 caracteres" />
 
         {error ? <p className="mt-4 rounded-md border border-ember/30 bg-ember/10 p-3 text-sm text-white">{error}</p> : null}
+        {success ? <p className="mt-4 rounded-md border border-mint/30 bg-mint/10 p-3 text-sm text-white">{success}</p> : null}
         <button className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white px-6 text-sm font-semibold text-ink transition hover:scale-[1.01] disabled:opacity-60" disabled={loading}>
           {loading ? <Loader2 className="animate-spin" size={18} /> : <Lock size={18} />}
           {isRegister ? "Criar conta" : "Entrar"}

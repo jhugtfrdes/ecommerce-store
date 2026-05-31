@@ -1,12 +1,24 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { createClient } from "@supabase/supabase-js";
 import type { Product } from "@/lib/products";
+import { assertSupabasePublicConfig, isSupabaseConfigured } from "@/lib/supabase/config";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
-const dataDir = path.join(process.cwd(), "data");
-const productsPath = path.join(dataDir, "products.json");
+type ProductRow = {
+  id: string;
+  slug: string;
+  name: string;
+  price: number;
+  stripe_price_id: string | null;
+  short_description: string;
+  description: string;
+  features: string[];
+  images: string[];
+  rating: number;
+  stock: number;
+  categories: { name: string } | null;
+};
 
 export type ProductInput = Omit<Product, "id" | "slug"> & {
   id?: string;
@@ -14,47 +26,100 @@ export type ProductInput = Omit<Product, "id" | "slug"> & {
 };
 
 export async function getProducts(): Promise<Product[]> {
-  const raw = await readFile(productsPath, "utf8");
-  return JSON.parse(raw) as Product[];
+  if (!isSupabaseConfigured()) {
+    return [];
+  }
+
+  const supabase = createSupabasePublicClient();
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, slug, name, price, stripe_price_id, short_description, description, features, images, rating, stock, categories(name)")
+    .eq("active", true)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Supabase products select failed:", error.message);
+    return [];
+  }
+
+  return ((data ?? []) as unknown as ProductRow[]).map(rowToProduct);
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | undefined> {
-  const products = await getProducts();
-  return products.find((product) => product.slug === slug);
-}
+  if (!isSupabaseConfigured()) {
+    return undefined;
+  }
 
-export async function saveProducts(products: Product[]) {
-  await mkdir(dataDir, { recursive: true });
-  await writeFile(productsPath, `${JSON.stringify(products, null, 2)}\n`, "utf8");
+  const supabase = createSupabasePublicClient();
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, slug, name, price, stripe_price_id, short_description, description, features, images, rating, stock, categories(name)")
+    .eq("slug", slug)
+    .eq("active", true)
+    .maybeSingle();
+
+  if (error || !data) {
+    return undefined;
+  }
+
+  return rowToProduct(data as unknown as ProductRow);
 }
 
 export async function createProduct(input: ProductInput) {
-  const products = await getProducts();
-  const product = normalizeProduct(input);
-  products.unshift(product);
-  await saveProducts(products);
-  return product;
+  const supabase = createSupabaseAdminClient();
+  if (!supabase) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY não está configurada.");
+  }
+
+  const normalized = normalizeProduct(input);
+  const categoryId = await upsertCategory(normalized.category);
+  const { data, error } = await supabase
+    .from("products")
+    .insert(toProductInsert(normalized, categoryId))
+    .select("id, slug, name, price, stripe_price_id, short_description, description, features, images, rating, stock, categories(name)")
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return rowToProduct(data as unknown as ProductRow);
 }
 
 export async function updateProduct(id: string, input: ProductInput) {
-  const products = await getProducts();
-  const index = products.findIndex((product) => product.id === id);
-
-  if (index === -1) {
-    return null;
+  const supabase = createSupabaseAdminClient();
+  if (!supabase) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY não está configurada.");
   }
 
-  const updated = normalizeProduct({ ...input, id, slug: input.slug || products[index].slug });
-  products[index] = updated;
-  await saveProducts(products);
-  return updated;
+  const normalized = normalizeProduct({ ...input, id });
+  const categoryId = await upsertCategory(normalized.category);
+  const { data, error } = await supabase
+    .from("products")
+    .update(toProductInsert(normalized, categoryId))
+    .eq("id", id)
+    .select("id, slug, name, price, stripe_price_id, short_description, description, features, images, rating, stock, categories(name)")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data ? rowToProduct(data as unknown as ProductRow) : null;
 }
 
 export async function deleteProduct(id: string) {
-  const products = await getProducts();
-  const nextProducts = products.filter((product) => product.id !== id);
-  await saveProducts(nextProducts);
-  return nextProducts.length !== products.length;
+  const supabase = createSupabaseAdminClient();
+  if (!supabase) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY não está configurada.");
+  }
+
+  const { error } = await supabase.from("products").update({ active: false }).eq("id", id);
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return true;
 }
 
 export function slugify(value: string) {
@@ -67,12 +132,60 @@ export function slugify(value: string) {
     .replace(/(^-|-$)/g, "");
 }
 
+function rowToProduct(row: ProductRow): Product {
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    category: row.categories?.name ?? "Sem categoria",
+    price: row.price,
+    stripePriceId: row.stripe_price_id ?? undefined,
+    shortDescription: row.short_description,
+    description: row.description,
+    features: row.features ?? [],
+    images: row.images?.length ? row.images : ["/uploads/placeholder.svg"],
+    rating: row.rating,
+    stock: row.stock
+  };
+}
+
+function createSupabasePublicClient() {
+  const { url, anonKey } = assertSupabasePublicConfig();
+
+  return createClient(url, anonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
+  });
+}
+
+async function upsertCategory(name: string) {
+  const supabase = createSupabaseAdminClient();
+  if (!supabase) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY não está configurada.");
+  }
+
+  const slug = slugify(name);
+  const { data, error } = await supabase
+    .from("categories")
+    .upsert({ name, slug }, { onConflict: "slug" })
+    .select("id")
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data.id;
+}
+
 function normalizeProduct(input: ProductInput): Product {
   const name = input.name.trim();
   const images = input.images.map((image) => image.trim()).filter(Boolean);
 
   return {
-    id: input.id || `prod_${randomUUID()}`,
+    id: input.id || "",
     slug: input.slug?.trim() || slugify(name),
     name,
     category: input.category.trim(),
@@ -84,5 +197,22 @@ function normalizeProduct(input: ProductInput): Product {
     images: images.length ? images : ["/uploads/placeholder.svg"],
     rating: Math.min(5, Math.max(1, Math.round(input.rating || 5))),
     stock: Math.max(0, Math.round(input.stock))
+  };
+}
+
+function toProductInsert(product: Product, categoryId: string) {
+  return {
+    category_id: categoryId,
+    slug: product.slug,
+    name: product.name,
+    price: product.price,
+    stripe_price_id: product.stripePriceId ?? null,
+    short_description: product.shortDescription,
+    description: product.description,
+    features: product.features,
+    images: product.images,
+    rating: product.rating,
+    stock: product.stock,
+    active: true
   };
 }

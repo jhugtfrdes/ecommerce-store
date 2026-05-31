@@ -1,47 +1,45 @@
 import { NextResponse } from "next/server";
-import { findIdentityByEmail } from "@/lib/auth";
-import { verifyPassword } from "@/lib/password";
-import { adminCookieName, createAdminSessionToken } from "@/lib/admin-session";
-import { getSetupMessage } from "@/lib/env";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+type ProfileAuth = {
+  email: string;
+  full_name: string | null;
+  role: "user" | "admin";
+};
 
 export async function POST(request: Request) {
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ error: "Supabase não está configurado. Define NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY." }, { status: 503 });
+  }
+
   const body = (await request.json()) as { email?: string; password?: string };
 
   if (!body.email || !body.password) {
     return NextResponse.json({ error: "Email e password são obrigatórios." }, { status: 400 });
   }
 
-  const identity = await findIdentityByEmail(body.email);
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: body.email,
+    password: body.password
+  });
 
-  if (!identity || !verifyPassword(body.password, identity.passwordHash)) {
-    const setup = getSetupMessage();
-    return NextResponse.json({
-      error: setup.configured
-        ? "Credenciais inválidas."
-        : "Credenciais inválidas. Para criar o admin inicial, executa npm run setup e reinicia o servidor.",
-      setup
-    }, { status: 401 });
+  if (error || !data.user) {
+    return NextResponse.json({ error: "Credenciais inválidas." }, { status: 401 });
   }
 
-  const response = NextResponse.json({
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("email, full_name, role")
+    .eq("id", data.user.id)
+    .maybeSingle<ProfileAuth>();
+
+  return NextResponse.json({
     user: {
-      email: identity.email,
-      name: identity.name,
-      role: identity.role
+      email: profile?.email ?? data.user.email,
+      name: profile?.full_name ?? data.user.user_metadata?.name ?? null,
+      role: profile?.role ?? "user"
     }
   });
-
-  response.cookies.set(adminCookieName, await createAdminSessionToken({
-    sub: identity.id,
-    email: identity.email,
-    role: identity.role
-  }), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 8
-  });
-
-  return response;
 }

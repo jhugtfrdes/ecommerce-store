@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
-import { adminCookieName } from "@/lib/admin-session";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export async function POST() {
-  const response = NextResponse.json({ ok: true });
-  response.cookies.delete(adminCookieName);
-  return response;
+  if (isSupabaseConfigured()) {
+    const supabase = await createSupabaseServerClient();
+    await supabase.auth.signOut();
+  }
+
+  return NextResponse.json({ ok: true });
 }

@@ -11,20 +11,16 @@ export function validateEnvironment(): EnvValidation {
   const missing: string[] = [];
   const warnings: string[] = [];
 
-  if (!process.env.ADMIN_SESSION_SECRET) {
-    warnings.push("ADMIN_SESSION_SECRET não está definido. A app vai usar um secret runtime temporário.");
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    missing.push("NEXT_PUBLIC_SUPABASE_URL");
   }
 
-  if (!process.env.ADMIN_EMAIL && !process.env.ADMIN_USERS_JSON) {
-    missing.push("ADMIN_EMAIL ou ADMIN_USERS_JSON");
+  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    missing.push("NEXT_PUBLIC_SUPABASE_ANON_KEY");
   }
 
-  if (!process.env.ADMIN_PASSWORD_HASH && !process.env.ADMIN_USERS_JSON) {
-    missing.push("ADMIN_PASSWORD_HASH ou ADMIN_USERS_JSON");
-  }
-
-  if (!process.env.NEXT_PUBLIC_SITE_URL) {
-    warnings.push("NEXT_PUBLIC_SITE_URL não está definido. Será usado http://localhost:3000.");
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    warnings.push("SUPABASE_SERVICE_ROLE_KEY não está definido. O admin não consegue gerir produtos nem uploads.");
   }
 
   return {
@@ -32,7 +28,7 @@ export function validateEnvironment(): EnvValidation {
     missing,
     warnings,
     message: missing.length
-      ? `Setup incompleto: configura ${missing.join(", ")} ou executa npm run setup.`
+      ? `Setup incompleto: configura ${missing.join(", ")} no .env.local e na Vercel.`
       : "Configuração pronta."
   };
 }
