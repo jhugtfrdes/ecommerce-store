@@ -1,8 +1,8 @@
 export function getSupabaseConfig() {
   return {
-    url: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY
+    url: readEnv("NEXT_PUBLIC_SUPABASE_URL"),
+    anonKey: readEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
+    serviceRoleKey: readEnv("SUPABASE_SERVICE_ROLE_KEY")
   };
 }
 
@@ -22,4 +22,14 @@ export function assertSupabasePublicConfig() {
     url: config.url,
     anonKey: config.anonKey
   };
+}
+
+function readEnv(name: string) {
+  const value = process.env[name]?.trim();
+
+  if (!value) {
+    return undefined;
+  }
+
+  return value.replace(/^["']|["']$/g, "");
 }
