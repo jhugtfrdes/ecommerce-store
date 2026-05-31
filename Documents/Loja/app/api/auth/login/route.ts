@@ -20,6 +20,7 @@ export async function POST(request: Request) {
   const password = body.password ?? "";
 
   authDebug(requestId, "login:start", {
+    nodeEnv: process.env.NODE_ENV,
     email,
     hasPassword: Boolean(password),
     passwordLength: password.length
@@ -39,7 +40,10 @@ export async function POST(request: Request) {
     email,
     userId: data.user?.id,
     signedInEmail: data.user?.email,
-    hasSession: Boolean(data.session),
+    session: Boolean(data.session),
+    sessionExpiresAt: data.session?.expires_at,
+    emailConfirmedAt: data.user?.email_confirmed_at,
+    confirmedAt: data.user?.confirmed_at,
     errorStatus: error?.status,
     errorMessage: error?.message
   });
@@ -60,7 +64,14 @@ export async function POST(request: Request) {
       email: profile?.email ?? data.user.email,
       name: profile?.full_name ?? data.user.user_metadata?.name ?? null,
       role: profile?.role ?? "user"
-    }
+    },
+    authenticated: true,
+    ...devDebug({
+      nodeEnv: process.env.NODE_ENV,
+      emailConfirmedAt: data.user.email_confirmed_at,
+      confirmedAt: data.user.confirmed_at,
+      session: Boolean(data.session)
+    })
   });
 }
 
@@ -86,4 +97,12 @@ function authDebug(requestId: string, step: string, data: Record<string, unknown
   }
 
   console.log(`[auth:${requestId}] ${step}`, data);
+}
+
+function devDebug(data: Record<string, unknown>) {
+  if (process.env.NODE_ENV === "production") {
+    return {};
+  }
+
+  return { _debug: data };
 }

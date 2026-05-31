@@ -34,7 +34,11 @@ export function AuthForm({ mode }: AuthFormProps) {
         body: JSON.stringify({ name, email, password })
       });
 
-      const data = (await response.json().catch(() => ({}))) as { error?: string; needsEmailConfirmation?: boolean };
+      const data = (await response.json().catch(() => ({}))) as {
+        authenticated?: boolean;
+        error?: string;
+        needsEmailConfirmation?: boolean;
+      };
 
       if (!response.ok) {
         setError(data.error || "Não foi possível autenticar. Confirma os dados e tenta novamente.");
@@ -43,6 +47,11 @@ export function AuthForm({ mode }: AuthFormProps) {
 
       if (isRegister && data.needsEmailConfirmation) {
         setSuccess("Conta criada. Confirma o email antes de entrar.");
+        return;
+      }
+
+      if (isRegister && data.authenticated === false) {
+        setError("Conta criada, mas não foi possível iniciar sessão automaticamente. Tenta entrar manualmente.");
         return;
       }
 

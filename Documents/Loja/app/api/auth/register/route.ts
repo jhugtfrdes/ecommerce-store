@@ -39,6 +39,7 @@ export async function POST(request: Request) {
   const password = body.password ?? "";
 
   authDebug(requestId, "register:start", {
+    nodeEnv: process.env.NODE_ENV,
     email,
     mode: isDevelopment ? "development-admin-createUser" : "production-signUp",
     hasPassword: Boolean(password),
@@ -81,6 +82,8 @@ async function registerConfirmedDevelopmentUser({ email, name, password }: Regis
     createdEmail: created.data.user?.email,
     emailConfirmedAt: created.data.user?.email_confirmed_at,
     confirmedAt: created.data.user?.confirmed_at,
+    session: false,
+    needsEmailConfirmation: !created.data.user?.email_confirmed_at,
     errorStatus: created.error?.status,
     errorMessage: created.error?.message
   });
@@ -94,13 +97,36 @@ async function registerConfirmedDevelopmentUser({ email, name, password }: Regis
     return NextResponse.json({ error: "Não foi possível criar a conta. Tenta novamente." }, { status: 500 });
   }
 
-  const profile = await ensureProfile(created.data.user.id, email, name, requestId);
+  const hydrated = await admin.auth.admin.getUserById(created.data.user.id);
+  const authUser = hydrated.data.user ?? created.data.user;
+
+  authDebug(requestId, "register:getUserById:result", {
+    email,
+    userId: authUser.id,
+    userEmail: authUser.email,
+    emailConfirmedAt: authUser.email_confirmed_at,
+    confirmedAt: authUser.confirmed_at,
+    errorStatus: hydrated.error?.status,
+    errorMessage: hydrated.error?.message
+  });
+
+  const profile = await ensureProfile(authUser.id, email, name, requestId);
 
   if (!profile) {
     return NextResponse.json({ error: "A conta foi criada, mas não foi possível preparar o perfil." }, { status: 500 });
   }
 
-  return signInAndRespond({ email, password, profile, status: 201, requestId });
+  return signInAndRespond({
+    email,
+    password,
+    profile,
+    status: 201,
+    requestId,
+    createdConfirmation: {
+      emailConfirmedAt: authUser.email_confirmed_at,
+      confirmedAt: authUser.confirmed_at
+    }
+  });
 }
 
 async function registerWithSupabaseSignup({ email, name, password }: RegisterInput, requestId: string) {
@@ -117,9 +143,10 @@ async function registerWithSupabaseSignup({ email, name, password }: RegisterInp
     email,
     userId: data.user?.id,
     createdEmail: data.user?.email,
-    hasSession: Boolean(data.session),
+    session: Boolean(data.session),
     emailConfirmedAt: data.user?.email_confirmed_at,
     confirmedAt: data.user?.confirmed_at,
+    needsEmailConfirmation: !data.session,
     errorStatus: error?.status,
     errorMessage: error?.message
   });
@@ -140,7 +167,16 @@ async function registerWithSupabaseSignup({ email, name, password }: RegisterInp
             role: profile?.role ?? "user"
           }
         : null,
-      needsEmailConfirmation: !data.session
+      authenticated: Boolean(data.session),
+      needsEmailConfirmation: !data.session,
+      ...devDebug({
+        nodeEnv: process.env.NODE_ENV,
+        mode: "production-signUp",
+        emailConfirmedAt: data.user?.email_confirmed_at,
+        confirmedAt: data.user?.confirmed_at,
+        session: Boolean(data.session),
+        needsEmailConfirmation: !data.session
+      })
     },
     { status: 201 }
   );
@@ -151,13 +187,18 @@ async function signInAndRespond({
   password,
   profile,
   status,
-  requestId
+  requestId,
+  createdConfirmation
 }: {
   email: string;
   password: string;
   profile: ProfileAuth;
   status: number;
   requestId: string;
+  createdConfirmation: {
+    emailConfirmedAt?: string | null;
+    confirmedAt?: string | null;
+  };
 }) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -166,7 +207,9 @@ async function signInAndRespond({
     email,
     userId: data.user?.id,
     signedInEmail: data.user?.email,
-    hasSession: Boolean(data.session),
+    session: Boolean(data.session),
+    sessionExpiresAt: data.session?.expires_at,
+    needsEmailConfirmation: !data.session,
     errorStatus: error?.status,
     errorMessage: error?.message
   });
@@ -186,7 +229,16 @@ async function signInAndRespond({
         name: profile.full_name ?? data.user.user_metadata?.name ?? null,
         role: profile.role
       },
-      needsEmailConfirmation: false
+      authenticated: true,
+      needsEmailConfirmation: false,
+      ...devDebug({
+        nodeEnv: process.env.NODE_ENV,
+        mode: "development-admin-createUser",
+        emailConfirmedAt: createdConfirmation.emailConfirmedAt,
+        confirmedAt: createdConfirmation.confirmedAt,
+        session: Boolean(data.session),
+        needsEmailConfirmation: false
+      })
     },
     { status }
   );
@@ -295,4 +347,12 @@ function authDebug(requestId: string, step: string, data: Record<string, unknown
   }
 
   console.log(`[auth:${requestId}] ${step}`, data);
+}
+
+function devDebug(data: Record<string, unknown>) {
+  if (!isDevelopment) {
+    return {};
+  }
+
+  return { _debug: data };
 }
