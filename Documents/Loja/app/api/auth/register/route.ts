@@ -24,6 +24,8 @@ type RegisterInput = {
 const isDevelopment = process.env.NODE_ENV !== "production";
 
 export async function POST(request: Request) {
+  const requestId = crypto.randomUUID();
+
   if (!isSupabaseConfigured()) {
     return NextResponse.json(
       { error: "Supabase não está configurado. Define NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY." },
@@ -32,29 +34,37 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json()) as RegisterBody;
-  const email = body.email?.trim().toLowerCase();
+  const email = normalizeEmail(body.email);
   const name = body.name?.trim() ?? "";
   const password = body.password ?? "";
+
+  authDebug(requestId, "register:start", {
+    email,
+    mode: isDevelopment ? "development-admin-createUser" : "production-signUp",
+    hasPassword: Boolean(password),
+    passwordLength: password.length
+  });
 
   if (!email || !password || password.length < 8) {
     return NextResponse.json({ error: "Indica um email válido e uma password com pelo menos 8 caracteres." }, { status: 400 });
   }
 
   if (isDevelopment) {
-    const response = await registerConfirmedDevelopmentUser({ email, name, password });
+    const response = await registerConfirmedDevelopmentUser({ email, name, password }, requestId);
 
     if (response) {
       return response;
     }
   }
 
-  return registerWithSupabaseSignup({ email, name, password });
+  return registerWithSupabaseSignup({ email, name, password }, requestId);
 }
 
-async function registerConfirmedDevelopmentUser({ email, name, password }: RegisterInput) {
+async function registerConfirmedDevelopmentUser({ email, name, password }: RegisterInput, requestId: string) {
   const admin = createSupabaseAdminClient();
 
   if (!admin) {
+    authDebug(requestId, "register:admin-client-missing", { email });
     return null;
   }
 
@@ -63,6 +73,16 @@ async function registerConfirmedDevelopmentUser({ email, name, password }: Regis
     password,
     email_confirm: true,
     user_metadata: { name }
+  });
+
+  authDebug(requestId, "register:createUser:result", {
+    email,
+    userId: created.data.user?.id,
+    createdEmail: created.data.user?.email,
+    emailConfirmedAt: created.data.user?.email_confirmed_at,
+    confirmedAt: created.data.user?.confirmed_at,
+    errorStatus: created.error?.status,
+    errorMessage: created.error?.message
   });
 
   if (created.error) {
@@ -74,16 +94,16 @@ async function registerConfirmedDevelopmentUser({ email, name, password }: Regis
     return NextResponse.json({ error: "Não foi possível criar a conta. Tenta novamente." }, { status: 500 });
   }
 
-  const profile = await ensureProfile(created.data.user.id, email, name);
+  const profile = await ensureProfile(created.data.user.id, email, name, requestId);
 
   if (!profile) {
     return NextResponse.json({ error: "A conta foi criada, mas não foi possível preparar o perfil." }, { status: 500 });
   }
 
-  return signInAndRespond({ email, password, profile, status: 201 });
+  return signInAndRespond({ email, password, profile, status: 201, requestId });
 }
 
-async function registerWithSupabaseSignup({ email, name, password }: RegisterInput) {
+async function registerWithSupabaseSignup({ email, name, password }: RegisterInput, requestId: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -91,6 +111,17 @@ async function registerWithSupabaseSignup({ email, name, password }: RegisterInp
     options: {
       data: { name }
     }
+  });
+
+  authDebug(requestId, "register:signUp:result", {
+    email,
+    userId: data.user?.id,
+    createdEmail: data.user?.email,
+    hasSession: Boolean(data.session),
+    emailConfirmedAt: data.user?.email_confirmed_at,
+    confirmedAt: data.user?.confirmed_at,
+    errorStatus: error?.status,
+    errorMessage: error?.message
   });
 
   if (error) {
@@ -119,18 +150,33 @@ async function signInAndRespond({
   email,
   password,
   profile,
-  status
+  status,
+  requestId
 }: {
   email: string;
   password: string;
   profile: ProfileAuth;
   status: number;
+  requestId: string;
 }) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-  if (error || !data.user) {
-    return NextResponse.json({ error: "Conta criada, mas não foi possível iniciar sessão automaticamente." }, { status: 201 });
+  authDebug(requestId, "register:autoSignIn:result", {
+    email,
+    userId: data.user?.id,
+    signedInEmail: data.user?.email,
+    hasSession: Boolean(data.session),
+    errorStatus: error?.status,
+    errorMessage: error?.message
+  });
+
+  if (error || !data.user || !data.session) {
+    const friendly = getFriendlyAuthError(error ?? { message: "Missing session", status: 401 });
+    return NextResponse.json(
+      { error: `Conta criada, mas não foi possível iniciar sessão automaticamente. ${friendly.message}` },
+      { status: friendly.status }
+    );
   }
 
   return NextResponse.json(
@@ -146,10 +192,11 @@ async function signInAndRespond({
   );
 }
 
-async function ensureProfile(userId: string, email: string, name: string) {
+async function ensureProfile(userId: string, email: string, name: string, requestId: string) {
   const admin = createSupabaseAdminClient();
 
   if (!admin) {
+    authDebug(requestId, "register:profile:admin-client-missing", { email, userId });
     return null;
   }
 
@@ -166,6 +213,14 @@ async function ensureProfile(userId: string, email: string, name: string) {
     )
     .select("email, full_name, role")
     .single<ProfileAuth>();
+
+  authDebug(requestId, "register:profile:result", {
+    email,
+    userId,
+    profileEmail: data?.email,
+    profileRole: data?.role,
+    errorMessage: error?.message
+  });
 
   if (error) {
     console.error("Supabase profile upsert failed:", error.message);
@@ -196,6 +251,20 @@ function getFriendlyAuthError(error: { message?: string; status?: number }) {
     };
   }
 
+  if (message.includes("email not confirmed") || message.includes("not confirmed")) {
+    return {
+      status: 401,
+      message: "O email desta conta ainda não está confirmado no Supabase."
+    };
+  }
+
+  if (message.includes("invalid login") || message.includes("invalid credentials")) {
+    return {
+      status: 401,
+      message: "Email ou password incorretos."
+    };
+  }
+
   if (message.includes("already") || message.includes("registered") || message.includes("exists")) {
     return {
       status: 409,
@@ -212,6 +281,18 @@ function getFriendlyAuthError(error: { message?: string; status?: number }) {
 
   return {
     status: error.status && error.status >= 400 ? error.status : 400,
-    message: "Não foi possível criar a conta agora. Tenta novamente."
+    message: "Não foi possível autenticar agora. Tenta novamente."
   };
+}
+
+function normalizeEmail(email: string | undefined) {
+  return email?.trim().toLowerCase() ?? "";
+}
+
+function authDebug(requestId: string, step: string, data: Record<string, unknown>) {
+  if (!isDevelopment) {
+    return;
+  }
+
+  console.log(`[auth:${requestId}] ${step}`, data);
 }
