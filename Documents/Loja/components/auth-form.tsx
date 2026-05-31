@@ -37,12 +37,12 @@ export function AuthForm({ mode }: AuthFormProps) {
       const data = (await response.json().catch(() => ({}))) as { error?: string; needsEmailConfirmation?: boolean };
 
       if (!response.ok) {
-        setError(data.error || "Não foi possível autenticar.");
+        setError(data.error || "Não foi possível autenticar. Confirma os dados e tenta novamente.");
         return;
       }
 
       if (isRegister && data.needsEmailConfirmation) {
-        setSuccess("Conta criada. Confirma o email no Supabase Auth antes de entrar.");
+        setSuccess("Conta criada. Confirma o email antes de entrar.");
         return;
       }
 
