@@ -10,7 +10,7 @@ export function Footer() {
           </Link>
           <p className="mt-2">Ecommerce premium em Next.js, TailwindCSS e Stripe.</p>
         </div>
-        <div className="flex gap-5">
+        <div className="flex flex-wrap gap-x-5 gap-y-3">
           <Link href="/#produtos" className="transition hover:text-white">
             Produtos
           </Link>
@@ -22,6 +22,12 @@ export function Footer() {
           </Link>
           <Link href="/admin" className="transition hover:text-white">
             Admin
+          </Link>
+          <Link href="/privacy" className="transition hover:text-white">
+            Privacy Policy
+          </Link>
+          <Link href="/terms" className="transition hover:text-white">
+            Terms of Service
           </Link>
         </div>
       </div>
